@@ -1,0 +1,5 @@
+user_files/
+venv/
+.env
+.vscode
+parsing_data.db
