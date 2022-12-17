@@ -6,8 +6,8 @@ import sqlite3
 
 from dotenv import load_dotenv
 
-from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
+from selenium import webdriver
 
 import pandas as pd
 
@@ -19,6 +19,20 @@ load_dotenv()
 MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 bot = telebot.TeleBot(os.getenv('BOT_TOKEN'))
+
+
+def set_chrome_options():
+    """Устанавливает параметры chrome для Selenium.
+       Параметры Chrome для безголового браузера включены.
+    """
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_prefs = {}
+    chrome_options.experimental_options['prefs'] = chrome_prefs
+    chrome_prefs['profile.default_content_settings'] = {'images': 2}
+    return chrome_options
 
 
 @bot.message_handler(commands=['start', 'help'])
@@ -107,10 +121,9 @@ def scraping_by_file_content(message, content):
     Проводит парсинг по данным из таблицы и выводит сообщение
     пользователю со средней ценой сущности на одной странице.
     """
-    chrome_options = Options()
-    chrome_options.add_experimental_option('detach', True)
+    chrome_options = set_chrome_options()
 
-    driver = Chrome(chrome_options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options)
 
     avg_price_message = ''
 
@@ -137,6 +150,8 @@ def scraping_by_file_content(message, content):
                               f'"{content[i][0]}" -> {avg_price}\n')
 
     bot.send_message(message.chat.id, avg_price_message)
+
+    driver.close()
 
 
 bot.infinity_polling()
