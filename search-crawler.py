@@ -37,6 +37,7 @@ def set_chrome_options():
 
 @bot.message_handler(commands=['start', 'help'])
 def start(message):
+    """Начало работы бота."""
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     button1 = types.KeyboardButton(text='Загрузить файл')
     markup.add(button1)
@@ -102,7 +103,9 @@ def save_file_content_to_database(message, df):
         c.execute('''CREATE TABLE zuzubliks(name TEXT,url TEXT, xpath TEXT)''')
 
     except sqlite3.OperationalError:
+        pass
 
+    finally:
         content = []
         for i in range(len(df)):
             content.append((df['name'].iloc[i],
