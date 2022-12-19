@@ -97,24 +97,25 @@ def save_file_content_to_database(message, df):
     """
     Сохраняет содержимое файла в локальную базу данных sqlite.
     """
-    try:
-        conn = sqlite3.connect('parsing_data.db')
-        c = conn.cursor()
-        c.execute('''CREATE TABLE zuzubliks(name TEXT,url TEXT, xpath TEXT)''')
+    con = sqlite3.connect('parsing_data.db')
+    cur = con.cursor()
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS zuzubliks(
+        name TEXT,
+        url TEXT,
+        xpath TEXT
+    );
+    ''')
 
-    except sqlite3.OperationalError:
-        pass
+    content = []
+    for i in range(len(df)):
+        content.append((df['name'].iloc[i],
+                        df['url'].iloc[i],
+                        df['xpath'].iloc[i]))
 
-    finally:
-        content = []
-        for i in range(len(df)):
-            content.append((df['name'].iloc[i],
-                            df['url'].iloc[i],
-                            df['xpath'].iloc[i]))
-
-        c.executemany('''INSERT INTO zuzubliks VALUES(?,?,?)''', content)
-        conn.commit()
-        conn.close()
+    cur.executemany('''INSERT INTO zuzubliks VALUES(?,?,?)''', content)
+    con.commit()
+    con.close()
 
     scraping_by_file_content(message, content)
 
