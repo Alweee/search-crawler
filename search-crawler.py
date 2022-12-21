@@ -17,13 +17,14 @@ from telebot import types
 load_dotenv()
 
 MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+PAGE_COUNT = 3
 
 bot = telebot.TeleBot(os.getenv('BOT_TOKEN'))
 
 
 def set_chrome_options():
-    """Устанавливает параметры chrome для Selenium.
-       Параметры Chrome для безголового браузера включены.
+    """Устанавливает параметры chrome для Selenium,
+       для работы в docker-container.
     """
     chrome_options = Options()
     chrome_options.add_argument('--headless')
@@ -99,6 +100,7 @@ def save_file_content_to_database(message, df):
     """
     con = sqlite3.connect('parsing_data.db')
     cur = con.cursor()
+
     cur.execute('''
     CREATE TABLE IF NOT EXISTS zuzubliks(
         name TEXT,
@@ -113,7 +115,8 @@ def save_file_content_to_database(message, df):
                         df['url'].iloc[i],
                         df['xpath'].iloc[i]))
 
-    cur.executemany('''INSERT INTO zuzubliks VALUES(?,?,?)''', content)
+    cur.executemany('''INSERT INTO zuzubliks VALUES(?, ?, ?);''', content)
+
     con.commit()
     con.close()
 
@@ -140,22 +143,23 @@ def scraping_by_file_content(message, content):
 
         product_cards = driver.find_elements('xpath', xpath_query)
 
-        sum = 0
-        for card in product_cards:
-            price = int(card.text.replace(' ', '').replace('₽', ''))
-            sum += price
+        if len(product_cards) == 0:
+            unlucky_message = 'Парсинг не удался :('
+            avg_price_message += (f'Средняя цена товара '
+                                  f'"{content[i][0]}" --> {unlucky_message}\n')
+        else:
+            sum = 0
+            for card in product_cards:
+                price = int(card.text.replace(' ', '').replace('₽', ''))
+                sum += price
 
-        try:
             avg_price = (sum)//len(product_cards)
-        except ZeroDivisionError:
-            avg_price = 'Нас раскрыли:) попробуйте позже'
-
-        avg_price_message += (f'Средняя цена товара '
-                              f'"{content[i][0]}" -> {avg_price}\n')
-
-    bot.send_message(message.chat.id, avg_price_message)
+            avg_price_message += (f'Средняя цена товара '
+                                  f'"{content[i][0]}" --> {avg_price}\n')
 
     driver.close()
+
+    bot.send_message(message.chat.id, avg_price_message)
 
 
 bot.infinity_polling()
