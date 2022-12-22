@@ -23,7 +23,7 @@ bot = telebot.TeleBot(os.getenv('BOT_TOKEN'))
 
 
 def set_chrome_options():
-    """Устанавливает параметры chrome для Selenium,
+    """Устанавливает параметры Chrome для Selenium,
        для работы в docker-container.
     """
     chrome_options = Options()
@@ -61,18 +61,21 @@ def test_file_type(message):
 @bot.message_handler(func=test_file_type, content_types=['document'])
 def save_file(message):
     """Получает файл от пользователя и сохранет его."""
-    file_name = message.document.file_name
-    file_obj = bot.get_file(message.document.file_id)
-    downloaded_file = bot.download_file(file_obj.file_path)
+    try:
+        file_name = message.document.file_name
+        file_obj = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_obj.file_path)
 
-    file_path = Path(Path(). absolute(), 'user_files',
-                     f'user_{message.chat.first_name}', file_name)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path = Path(Path(). absolute(), 'user_files',
+                         f'user_{message.chat.first_name}', file_name)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(file_path, 'wb') as f:
-        f.write(downloaded_file)
-
-    handle_file(message, file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    except Exception:
+        bot.send_message(message.chat.id, 'Ошибка при сохранении файла!')
+    else:
+        handle_file(message, file_path)
 
 
 def handle_file(message, path):
@@ -80,47 +83,56 @@ def handle_file(message, path):
     Открывает файл библиотекой pandas и выводит
     содержимое файла сообщением пользователю.
     """
-    df = pd.read_excel(path)
+    try:
+        df = pd.read_excel(path)
 
-    text = 'Содержимое файла:'
+        if len(df) == 0:
+            bot.send_message(message.chat.id,
+                             f'Файл "{message.document.file_name}" пустой!')
+        else:
+            text = 'Содержимое файла:'
 
-    for i in range(len(df)):
-        text += ('\n\n name: ' + str((df['name'].iloc[i])) + '\n '
-                 'url: ' + str((df['url'].iloc[i])) + '\n '
-                 'xpath: ' + str((df['xpath'].iloc[i])))
-
-    bot.send_message(message.chat.id, text)
-
-    save_file_content_to_database(message, df)
+            for i in range(len(df)):
+                text += ('\n\n name: ' + str((df['name'].iloc[i])) + '\n '
+                         'url: ' + str((df['url'].iloc[i])) + '\n '
+                         'xpath: ' + str((df['xpath'].iloc[i])))
+    except Exception:
+        bot.send_message(message.chat.id, 'Ошибка при чтении файла!')
+    else:
+        bot.send_message(message.chat.id, text)
+        save_file_content_to_database(message, df)
 
 
 def save_file_content_to_database(message, df):
     """
     Сохраняет содержимое файла в локальную базу данных sqlite.
     """
-    con = sqlite3.connect('parsing_data.db')
-    cur = con.cursor()
+    try:
+        con = sqlite3.connect('parsing_data.db')
+        cur = con.cursor()
 
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS zuzubliks(
-        name TEXT,
-        url TEXT,
-        xpath TEXT
-    );
-    ''')
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS zuzubliks(
+            name TEXT,
+            url TEXT,
+            xpath TEXT
+        );
+        ''')
 
-    content = []
-    for i in range(len(df)):
-        content.append((df['name'].iloc[i],
-                        df['url'].iloc[i],
-                        df['xpath'].iloc[i]))
+        content = []
+        for i in range(len(df)):
+            content.append((df['name'].iloc[i],
+                            df['url'].iloc[i],
+                            df['xpath'].iloc[i]))
 
-    cur.executemany('''INSERT INTO zuzubliks VALUES(?, ?, ?);''', content)
+        cur.executemany('''INSERT INTO zuzubliks VALUES(?, ?, ?);''', content)
 
-    con.commit()
-    con.close()
-
-    scraping_by_file_content(message, content)
+        con.commit()
+        con.close()
+    except Exception:
+        bot.send_message(message.chat.id, 'Ошибка при сохранении в БД!')
+    else:
+        scraping_by_file_content(message, content)
 
 
 def scraping_by_file_content(message, content):
